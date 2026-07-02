@@ -15,6 +15,19 @@ class WhatsAppClient:
             "Content-Type": "application/json"
         }
 
+    def _resolve_media_url(self, url: str) -> str:
+        """Translates local media links to public tunnel URLs when PUBLIC_URL is configured."""
+        if not url:
+            return url
+        if settings.PUBLIC_URL:
+            public_url = settings.PUBLIC_URL.rstrip("/")
+            for local_prefix in ["http://127.0.0.1:8000", "http://localhost:8000", f"http://{settings.HOST}:{settings.PORT}"]:
+                if url.startswith(local_prefix):
+                    resolved = url.replace(local_prefix, public_url)
+                    logger.info(f"Rewriting local media URL {url} to public URL: {resolved}")
+                    return resolved
+        return url
+
     async def _send_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Helper to send POST request to WhatsApp Graph API, falling back to simulator logs if credentials are empty."""
         if settings.is_simulated_whatsapp:
@@ -82,37 +95,39 @@ class WhatsAppClient:
 
     async def send_image_message(self, customer_phone: str, image_url: str, caption: Optional[str] = None) -> Dict[str, Any]:
         """Dispatches an image message via public URL."""
+        resolved_url = self._resolve_media_url(image_url)
         payload = {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
             "to": customer_phone,
             "type": "image",
             "image": {
-                "link": image_url
+                "link": resolved_url
             }
         }
         if caption:
             payload["image"]["caption"] = caption
             
-        logger.info(f"Sending image ({image_url}) to {customer_phone}")
+        logger.info(f"Sending image ({resolved_url}) to {customer_phone}")
         return await self._send_request(payload)
 
     async def send_document_message(self, customer_phone: str, document_url: str, filename: str, caption: Optional[str] = None) -> Dict[str, Any]:
         """Dispatches a document/PDF message via public URL."""
+        resolved_url = self._resolve_media_url(document_url)
         payload = {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
             "to": customer_phone,
             "type": "document",
             "document": {
-                "link": document_url,
+                "link": resolved_url,
                 "filename": filename
             }
         }
         if caption:
             payload["document"]["caption"] = caption
 
-        logger.info(f"Sending document ({filename} @ {document_url}) to {customer_phone}")
+        logger.info(f"Sending document ({filename} @ {resolved_url}) to {customer_phone}")
         return await self._send_request(payload)
 
 whatsapp_client = WhatsAppClient()

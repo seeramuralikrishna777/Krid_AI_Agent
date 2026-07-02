@@ -21,6 +21,7 @@ class Settings:
     # Server Settings
     PORT: int = int(os.getenv("PORT", "8000"))
     HOST: str = os.getenv("HOST", "0.0.0.0")
+    PUBLIC_URL: str = os.getenv("PUBLIC_URL", "")
     
     @property
     def is_simulated_whatsapp(self) -> bool:

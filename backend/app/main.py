@@ -36,6 +36,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Middleware to dynamically detect public base URL from incoming requests
+@app.middleware("http")
+async def detect_public_url_middleware(request: Request, call_next):
+    if not settings.PUBLIC_URL:
+        base_url_str = str(request.base_url).rstrip("/")
+        if "127.0.0.1" not in base_url_str and "localhost" not in base_url_str:
+            settings.PUBLIC_URL = base_url_str
+            logger.info(f"Dynamically detected public base URL from request: {settings.PUBLIC_URL}")
+    response = await call_next(request)
+    return response
+
 # Initialize DB on Startup
 @app.on_event("startup")
 async def startup_db_client():

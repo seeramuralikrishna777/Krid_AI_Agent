@@ -169,6 +169,8 @@ class DatabaseManager:
         await self.seed_initial_data()
 
     async def seed_initial_data(self):
+        base_url = settings.PUBLIC_URL.rstrip("/") if settings.PUBLIC_URL else "http://127.0.0.1:8000"
+        
         # Seed Tenant A
         tenant_a = {
             "_id": "tenant_a",
@@ -178,12 +180,12 @@ class DatabaseManager:
                              "Recommend catalogs or showroom images when appropriate. Always offer details about our 'sofa' (showroom image) or 'catalog' (PDF catalog) when the user expresses interest in furniture, catalogs, or sofa designs.",
             "media_library": {
                 "catalog": {
-                    "url": "http://127.0.0.1:8000/static/luxury_furniture_catalog.pdf",
+                    "url": f"{base_url}/static/luxury_furniture_catalog.pdf",
                     "type": "document",
                     "filename": "luxury_furniture_catalog.pdf"
                 },
                 "sofa": {
-                    "url": "http://127.0.0.1:8000/static/showroom_sofa.png",
+                    "url": f"{base_url}/static/showroom_sofa.png",
                     "type": "image",
                     "filename": "showroom_sofa.png"
                 }
@@ -200,12 +202,12 @@ class DatabaseManager:
                              "Offer invoice sheets or repair diagrams when the customer asks. Always offer details about our 'invoice' (sample invoice) or 'diagram' (engine diagram) when they ask about quotes, repair diagnostics, or service procedures.",
             "media_library": {
                 "invoice": {
-                    "url": "http://127.0.0.1:8000/static/sample_invoice.pdf",
+                    "url": f"{base_url}/static/sample_invoice.pdf",
                     "type": "document",
                     "filename": "sample_invoice.pdf"
                 },
                 "diagram": {
-                    "url": "http://127.0.0.1:8000/static/engine_diagram.png",
+                    "url": f"{base_url}/static/engine_diagram.png",
                     "type": "image",
                     "filename": "engine_diagram.png"
                 }

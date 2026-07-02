@@ -279,32 +279,37 @@ Return ONLY a valid JSON object matching the following structure:
             logger.error(f"OpenAI LLM failed: {e}. Trying Gemini fallback.")
             
     if settings.GEMINI_API_KEY:
-        try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            llm = ChatGoogleGenerativeAI(google_api_key=settings.GEMINI_API_KEY, model="gemini-2.5-flash", temperature=0.0)
-            response = await llm.ainvoke(prompt)
-            
-            # Unpack text content if response is returned in a list of parts
-            if isinstance(response.content, list):
-                raw_content = ""
-                for part in response.content:
-                    if isinstance(part, dict) and "text" in part:
-                        raw_content += part["text"]
-                    elif isinstance(part, str):
-                        raw_content += part
-            else:
-                raw_content = response.content
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        models_to_try = ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-2.0-flash", "gemini-2.5-flash"]
+        for model_name in models_to_try:
+            try:
+                logger.info(f"Attempting to query Gemini model: {model_name}")
+                llm = ChatGoogleGenerativeAI(google_api_key=settings.GEMINI_API_KEY, model=model_name, temperature=0.0, transport="rest")
+                response = await llm.ainvoke(prompt)
+                
+                # Unpack text content if response is returned in a list of parts
+                if isinstance(response.content, list):
+                    raw_content = ""
+                    for part in response.content:
+                        if isinstance(part, dict) and "text" in part:
+                            raw_content += part["text"]
+                        elif isinstance(part, str):
+                            raw_content += part
+                else:
+                    raw_content = response.content
 
-            raw_content = raw_content.strip()
-            # Remove markdown JSON blocks if present
-            if raw_content.startswith("```json"):
-                raw_content = raw_content[7:]
-            if raw_content.endswith("```"):
-                raw_content = raw_content[:-3]
-            result = json.loads(raw_content.strip())
-            return result
-        except Exception as e:
-            logger.error(f"Gemini LLM failed: {e}. Falling back to Rule-Based simulator.")
+                raw_content = raw_content.strip()
+                # Remove markdown JSON blocks if present
+                if raw_content.startswith("```json"):
+                    raw_content = raw_content[7:]
+                if raw_content.endswith("```"):
+                    raw_content = raw_content[:-3]
+                result = json.loads(raw_content.strip())
+                logger.info(f"Successfully generated response using Gemini model: {model_name}")
+                return result
+            except Exception as e:
+                logger.error(f"Gemini model {model_name} failed: {e}")
+                continue
 
     # Rule-Based Simulator as a final fallback
     return await run_simulated_llm(state)

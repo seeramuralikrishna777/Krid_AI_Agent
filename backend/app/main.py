@@ -1,4 +1,5 @@
 import os
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List
@@ -142,12 +143,24 @@ async def receive_webhook(
     logger.info(f"Received webhook event: {payload}")
 
     # 2. Parse Meta WhatsApp Payload Structure
-    # Nested properties: entry -> changes -> value -> messages
+    # Nested properties: entry -> changes -> value -> messages / statuses
     entries = payload.get("entry", [])
     for entry in entries:
         changes = entry.get("changes", [])
         for change in changes:
             value = change.get("value", {})
+            
+            # Handle Outbound Status Updates (Read Receipts, Delivery receipts)
+            statuses = value.get("statuses", [])
+            for status_item in statuses:
+                msg_id = status_item.get("id")
+                status_val = status_item.get("status")  # sent, delivered, read, failed
+                logger.info(f"Received Meta status callback: Message {msg_id} status is now '{status_val}'")
+                await db_manager.db.messages.update_one(
+                    {"_id": msg_id},
+                    {"$set": {"status": status_val}}
+                )
+
             messages = value.get("messages", [])
             metadata = value.get("metadata", {})
             phone_number_id = metadata.get("phone_number_id")
@@ -230,6 +243,18 @@ async def get_messages(session_id: str):
     cursor.sort("timestamp", 1)  # Ascending chronological order
     return await cursor.to_list(length=200)
 
+# Simulated Status Lifecycle scheduler for Sandbox mode
+async def simulate_message_status_lifecycle(message_id: str):
+    """Simulates the sent -> delivered -> read status progression for sandbox messages."""
+    try:
+        await asyncio.sleep(1.0)
+        await db_manager.db.messages.update_one({"_id": message_id}, {"$set": {"status": "delivered"}})
+        await asyncio.sleep(2.0)
+        await db_manager.db.messages.update_one({"_id": message_id}, {"$set": {"status": "read"}})
+        logger.info(f"Simulated read receipt lifecycle completed for broadcast message: {message_id}")
+    except Exception as e:
+        logger.error(f"Error in simulated read receipt lifecycle for broadcast message {message_id}: {e}")
+
 # 6. Campaign Broadcast Dispatch
 @app.post("/api/broadcast")
 async def trigger_broadcast(request: BroadcastRequest, background_tasks: BackgroundTasks):
@@ -267,7 +292,6 @@ async def trigger_broadcast(request: BroadcastRequest, background_tasks: Backgro
     # Queue up sending broadcast to each number in the background
     for num in request.numbers:
         session_id = f"{request.tenant_id}_{num}"
-        outbound_id = f"broad_{datetime.now(timezone.utc).timestamp()}_{num}"
         
         # 1. Register Session if not exists
         await db_manager.db.sessions.update_one(
@@ -283,29 +307,38 @@ async def trigger_broadcast(request: BroadcastRequest, background_tasks: Backgro
             upsert=True
         )
         
-        # 2. Append message log
-        await db_manager.db.messages.insert_one({
-            "_id": outbound_id,
-            "session_id": session_id,
-            "tenant_id": request.tenant_id,
-            "customer_phone": num,
-            "direction": "outbound",
-            "type": reply["type"],
-            "content": reply["content"],
-            "media_url": reply["media_url"],
-            "filename": reply["filename"],
-            "timestamp": datetime.now(timezone.utc)
-        })
-        
-        # 3. Dispatch via WhatsApp Graph API in background
-        async def send_broadcast_task(num_val=num, reply_val=reply):
+        # 2. Dispatch via WhatsApp Graph API in background and then log the message
+        async def send_broadcast_task(num_val=num, reply_val=reply, s_id=session_id, t_id=request.tenant_id):
             try:
+                response = None
                 if reply_val["type"] == "image":
-                    await whatsapp_client.send_image_message(num_val, reply_val["media_url"], reply_val["content"])
+                    response = await whatsapp_client.send_image_message(num_val, reply_val["media_url"], reply_val["content"])
                 elif reply_val["type"] == "document":
-                    await whatsapp_client.send_document_message(num_val, reply_val["media_url"], reply_val["filename"], reply_val["content"])
+                    response = await whatsapp_client.send_document_message(num_val, reply_val["media_url"], reply_val["filename"], reply_val["content"])
                 else:
-                    await whatsapp_client.send_text_message(num_val, reply_val["content"])
+                    response = await whatsapp_client.send_text_message(num_val, reply_val["content"])
+                
+                final_msg_id = f"broad_{datetime.now(timezone.utc).timestamp()}_{num_val}"
+                if response and "messages" in response and len(response["messages"]) > 0:
+                    final_msg_id = response["messages"][0]["id"]
+                
+                # Append message log here with final ID and status: "sent"
+                await db_manager.db.messages.insert_one({
+                    "_id": final_msg_id,
+                    "session_id": s_id,
+                    "tenant_id": t_id,
+                    "customer_phone": num_val,
+                    "direction": "outbound",
+                    "type": reply_val["type"],
+                    "content": reply_val["content"],
+                    "media_url": reply_val["media_url"],
+                    "filename": reply_val["filename"],
+                    "status": "sent",
+                    "timestamp": datetime.now(timezone.utc)
+                })
+
+                if settings.is_simulated_whatsapp:
+                    asyncio.create_task(simulate_message_status_lifecycle(final_msg_id))
             except Exception as ex:
                 logger.error(f"Failed to dispatch broadcast to {num_val}: {ex}")
                 
@@ -376,7 +409,8 @@ async def simulate_incoming_message(
         "media_url": input_data.media_url,
         "mime_type": input_data.mime_type,
         "filename": input_data.filename,
-        "timestamp": datetime.now(timezone.utc)
+        "timestamp": datetime.now(timezone.utc),
+        "status": "read"
     })
     
     # Kick off LangGraph agent loop in background thread

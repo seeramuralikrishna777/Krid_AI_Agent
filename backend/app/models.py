@@ -43,6 +43,7 @@ class MessageLog(BaseModel):
     media_url: Optional[str] = None
     mime_type: Optional[str] = None
     filename: Optional[str] = None
+    status: Optional[str] = "sent"  # "sent", "delivered", "read", "failed"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Config:

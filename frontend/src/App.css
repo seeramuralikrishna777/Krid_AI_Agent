@@ -13,17 +13,17 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 24px;
-  background: var(--primary) !important;
-  border: none !important;
-  color: white;
+  padding: 10px 24px;
+  background: var(--panel-glass) !important;
+  border: 1px solid var(--border-glass) !important;
+  color: var(--text-primary);
   border-radius: var(--radius-md);
 }
 
 .logo-section h1 {
-  font-size: 1.35rem;
+  font-size: 1.25rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -39,12 +39,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: #e1f3ec;
+  border: 1px solid #c2e7da;
   padding: 6px 12px;
   border-radius: var(--radius-sm);
   font-size: 0.8rem;
-  color: #ffffff;
+  color: var(--primary);
+  font-weight: 600;
 }
 
 .mode-dot {
@@ -668,4 +669,147 @@
   gap: 12px;
   justify-content: flex-end;
   background: #f0f2f5;
+}
+
+.mobile-diag-header {
+  display: none !important;
+}
+
+/* Responsive / Adaptive Styles */
+@media (max-width: 1024px) {
+  .mobile-diag-header {
+    display: flex !important;
+  }
+
+  .app-container {
+    padding: 8px;
+    gap: 8px;
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+  }
+
+  .header {
+    padding: 10px 16px;
+  }
+
+  .logo-section h1 {
+    font-size: 1.1rem !important;
+  }
+
+  .system-mode-badge {
+    display: none !important; /* Hide long badge text on mobile */
+  }
+
+  .btn {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+
+  /* Tenant Switcher - hide on active conversation to save vertical screen space */
+  .app-container.has-selected-session .tenant-tabs {
+    display: none !important;
+  }
+
+  .tenant-tab {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+
+  /* Main Grid Collapses */
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+    height: calc(100vh - 120px);
+  }
+
+  /* 1. If NO conversation is active */
+  .dashboard-grid:not(.has-selected-session) .sessions-panel {
+    display: flex !important;
+    flex: 1;
+    height: 100%;
+  }
+
+  .dashboard-grid:not(.has-selected-session) .chat-panel,
+  .dashboard-grid:not(.has-selected-session) .diag-panel {
+    display: none !important;
+  }
+
+  /* 2. If A conversation is active */
+  .dashboard-grid.has-selected-session .sessions-panel {
+    display: none !important;
+  }
+
+  /* Under active session, toggle visibility based on mobile-tab class */
+  .dashboard-grid.has-selected-session.mobile-tab-chat .chat-panel {
+    display: flex !important;
+    flex: 1;
+    height: 100%;
+  }
+
+  .dashboard-grid.has-selected-session.mobile-tab-chat .diag-panel {
+    display: none !important;
+  }
+
+  .dashboard-grid.has-selected-session.mobile-tab-trace .chat-panel {
+    display: none !important;
+  }
+
+  .dashboard-grid.has-selected-session.mobile-tab-trace .diag-panel {
+    display: flex !important;
+    flex: 1;
+    height: 100%;
+  }
+
+  /* Header controls for mobile */
+  .mobile-back-btn {
+    display: inline-flex !important;
+    align-items: center;
+  }
+
+  .mobile-header-toggle {
+    display: flex !important;
+    align-items: center;
+  }
+
+  /* Adjust chat layout to fit small screens */
+  .chat-header {
+    padding: 10px 16px !important;
+  }
+
+  .chat-header h3 {
+    font-size: 0.95rem;
+  }
+
+  .chat-status-badge {
+    display: none !important; /* Hide badge to prevent overlap with trace toggler */
+  }
+
+  .sim-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sim-select {
+    max-width: 100% !important;
+    width: 100%;
+  }
+
+  .sim-input {
+    width: 100%;
+  }
+
+  .simulator-footer {
+    padding: 12px !important;
+  }
+
+  .drawer {
+    width: 100% !important; /* Drawer takes full screen on mobile */
+  }
+}
+
+@media (max-width: 480px) {
+  .logo-section h1 span {
+    display: none !important; /* Hide logo icon on very small screen */
+  }
 }

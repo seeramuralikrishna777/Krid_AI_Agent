@@ -45,6 +45,7 @@ interface MessageLog {
   media_url?: string;
   mime_type?: string;
   filename?: string;
+  status?: string;
   timestamp: string;
 }
 
@@ -118,6 +119,7 @@ export default function App() {
   // Dashboard Tabs & Drawers
   const [activeDiagTab, setActiveDiagTab] = useState<'trace' | 'db' | 'payload'>('trace');
   const [isBroadcastOpen, setIsBroadcastOpen] = useState<boolean>(false);
+  const [mobileTab, setMobileTab] = useState<'chat' | 'trace'>('chat');
   
   // Simulated message state
   const [simMsgType, setSimMsgType] = useState<'text' | 'image' | 'document'>('text');
@@ -332,6 +334,7 @@ export default function App() {
     }
     
     setSelectedSession(newSession);
+    setMobileTab('chat');
     setNewChatPhone('');
   };
 
@@ -356,6 +359,7 @@ export default function App() {
     }
     
     setSelectedSession(newSession);
+    setMobileTab('chat');
     setEmptyChatPhone('');
   };
 
@@ -377,12 +381,25 @@ export default function App() {
   };
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${selectedSession ? 'has-selected-session' : ''}`}>
       {/* Header */}
       <header className="header glass-panel">
-        <div className="logo-section">
-          <h1>
-            <span style={{ color: 'var(--primary)', display: 'inline-flex' }}><Icons.Chat /></span>
+        <div className="logo-section" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img 
+            src="/logo.png" 
+            alt="Krid.AI Logo" 
+            style={{ 
+              height: '38px', 
+              width: '38px', 
+              objectFit: 'cover', 
+              objectPosition: 'top center', 
+              borderRadius: '50%', 
+              border: '2px solid var(--primary)',
+              background: '#ffffff',
+              flexShrink: 0
+            }} 
+          />
+          <h1 style={{ margin: 0 }}>
             Krid.AI WhatsApp Orchestrator
           </h1>
         </div>
@@ -417,7 +434,7 @@ export default function App() {
       </section>
 
       {/* Main Grid */}
-      <div className="dashboard-grid">
+      <div className={`dashboard-grid ${selectedSession ? 'has-selected-session' : ''} mobile-tab-${mobileTab}`}>
         {/* Column 1: Active Chat Sessions */}
         <div className="sessions-panel glass-panel">
           <div className="panel-title">
@@ -466,7 +483,10 @@ export default function App() {
                   <div
                     key={session._id}
                     className={`session-item ${isSelected ? 'selected' : ''} ${isNeedsHuman ? 'needs-human' : ''}`}
-                    onClick={() => setSelectedSession(session)}
+                    onClick={() => {
+                      setSelectedSession(session);
+                      setMobileTab('chat');
+                    }}
                   >
                     <div className="session-item-header">
                       <span className="customer-num">+{session.customer_phone}</span>
@@ -498,13 +518,68 @@ export default function App() {
             <>
               {/* Chat Header */}
               <div className="chat-header">
+                <button 
+                  className="mobile-back-btn btn btn-secondary" 
+                  onClick={() => {
+                    setSelectedSession(null);
+                    setMobileTab('chat');
+                  }}
+                  style={{ display: 'none', padding: '6px 12px', fontSize: '0.8rem', marginRight: '10px' }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                  </svg>
+                  Chats
+                </button>
+                
                 <div className="chat-user-info">
                   <h3>+{selectedSession.customer_phone}</h3>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                     Session: {selectedSession._id}
                   </div>
                 </div>
-                <div>
+
+                <div className="mobile-header-toggle" style={{ display: 'none', background: '#f0f2f5', borderRadius: '8px', padding: '2px', marginLeft: 'auto', marginRight: '10px' }}>
+                  <button 
+                    type="button"
+                    className={`toggle-btn ${mobileTab === 'chat' ? 'active' : ''}`}
+                    onClick={() => setMobileTab('chat')}
+                    style={{
+                      background: mobileTab === 'chat' ? 'white' : 'transparent',
+                      border: 'none',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      color: mobileTab === 'chat' ? 'var(--primary)' : 'var(--text-secondary)',
+                      boxShadow: mobileTab === 'chat' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                    }}
+                  >
+                    Chat
+                  </button>
+                  <button 
+                    type="button"
+                    className={`toggle-btn ${mobileTab === 'trace' ? 'active' : ''}`}
+                    onClick={() => setMobileTab('trace')}
+                    style={{
+                      background: mobileTab === 'trace' ? 'white' : 'transparent',
+                      border: 'none',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      color: mobileTab === 'trace' ? 'var(--primary)' : 'var(--text-secondary)',
+                      boxShadow: mobileTab === 'trace' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                    }}
+                  >
+                    Trace
+                  </button>
+                </div>
+
+                <div className="chat-status-badge">
                   <span className={`badge ${selectedSession.status === 'NEEDS_HUMAN' ? 'badge-danger' : 'badge-success'}`}>
                     {selectedSession.status}
                   </span>
@@ -524,7 +599,16 @@ export default function App() {
 
                 {messages.length === 0 ? (
                   <div className="empty-chat">
-                    <Icons.Chat />
+                    <img 
+                      src="/logo.png" 
+                      alt="Krid.AI Logo" 
+                      style={{ 
+                        height: '70px', 
+                        objectFit: 'contain', 
+                        opacity: 0.8, 
+                        marginBottom: '8px' 
+                      }} 
+                    />
                     <p>Start the conversation using the sandbox simulator below.</p>
                   </div>
                 ) : (
@@ -567,8 +651,21 @@ export default function App() {
                         </div>
                         <span className="message-meta" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           {isInbound ? 'Customer' : 'Bot'} • {time}
-                          {!isInbound && <span style={{ color: '#38bdf8', fontSize: '0.9rem', fontWeight: 'bold', lineHeight: 1 }}>✓✓</span>}
-                          {isInbound && <span style={{ color: '#34d399', fontSize: '0.7rem', fontWeight: 600, marginLeft: '2px' }}>• Read</span>}
+                          {isInbound && (
+                            <span 
+                              style={{ 
+                                color: msg.status === 'read' ? '#53bdeb' : '#8696a0', 
+                                fontSize: '0.95rem', 
+                                fontWeight: 'bold', 
+                                lineHeight: 1, 
+                                marginLeft: '2px',
+                                display: 'inline-flex'
+                              }}
+                              title={msg.status || 'read'}
+                            >
+                              {msg.status === 'read' || msg.status === 'delivered' ? '✓✓' : '✓'}
+                            </span>
+                          )}
                         </span>
                       </div>
                     );
@@ -657,7 +754,15 @@ export default function App() {
             </>
           ) : (
             <div className="empty-chat">
-              <Icons.Chat />
+              <img 
+                src="/logo.png" 
+                alt="Krid.AI Logo" 
+                style={{ 
+                  height: '110px', 
+                  objectFit: 'contain', 
+                  marginBottom: '16px' 
+                }} 
+              />
               <h2>Welcome to Multi-Tenant Chat Audit Logs</h2>
               <p>Please select a conversation from the left panel to begin auditing agent execution and logs.</p>
               <div style={{ width: '100%', maxWidth: '360px', marginTop: '15px' }} className="glass-panel">
@@ -683,6 +788,70 @@ export default function App() {
 
         {/* Column 3: Live LangGraph Pipeline & Diagnostics */}
         <div className="diag-panel glass-panel">
+          {selectedSession && (
+            <div className="chat-header mobile-diag-header">
+              <button 
+                className="mobile-back-btn btn btn-secondary" 
+                onClick={() => {
+                  setSelectedSession(null);
+                  setMobileTab('chat');
+                }}
+                style={{ padding: '6px 12px', fontSize: '0.8rem', marginRight: '10px' }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+                  <line x1="19" y1="12" x2="5" y2="12"></line>
+                  <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Chats
+              </button>
+              
+              <div className="chat-user-info">
+                <h3>+{selectedSession.customer_phone}</h3>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  Session: {selectedSession._id}
+                </div>
+              </div>
+
+              <div className="mobile-header-toggle" style={{ background: '#f0f2f5', borderRadius: '8px', padding: '2px', marginLeft: 'auto', marginRight: '10px' }}>
+                <button 
+                  type="button"
+                  className={`toggle-btn ${mobileTab === 'chat' ? 'active' : ''}`}
+                  onClick={() => setMobileTab('chat')}
+                  style={{
+                    background: mobileTab === 'chat' ? 'white' : 'transparent',
+                    border: 'none',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    color: mobileTab === 'chat' ? 'var(--primary)' : 'var(--text-secondary)',
+                    boxShadow: mobileTab === 'chat' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                  }}
+                >
+                  Chat
+                </button>
+                <button 
+                  type="button"
+                  className={`toggle-btn ${mobileTab === 'trace' ? 'active' : ''}`}
+                  onClick={() => setMobileTab('trace')}
+                  style={{
+                    background: mobileTab === 'trace' ? 'white' : 'transparent',
+                    border: 'none',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    color: mobileTab === 'trace' ? 'var(--primary)' : 'var(--text-secondary)',
+                    boxShadow: mobileTab === 'trace' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                  }}
+                >
+                  Trace
+                </button>
+              </div>
+            </div>
+          )}
           <div className="diag-tabs">
             <div
               className={`diag-tab ${activeDiagTab === 'trace' ? 'active' : ''}`}

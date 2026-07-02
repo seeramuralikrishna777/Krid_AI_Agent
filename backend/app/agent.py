@@ -73,7 +73,8 @@ async def acknowledge_node(state: AgentState) -> AgentState:
                 "media_url": inbound_msg.get("media_url"),
                 "mime_type": inbound_msg.get("mime_type"),
                 "filename": inbound_msg.get("filename"),
-                "timestamp": inbound_msg.get("timestamp", datetime.now(timezone.utc))
+                "timestamp": inbound_msg.get("timestamp", datetime.now(timezone.utc)),
+                "status": "read"
             }
         },
         upsert=True
@@ -360,6 +361,19 @@ async def llm_reasoning_node(state: AgentState) -> AgentState:
         
     return state
 
+import asyncio
+
+async def simulate_message_status_lifecycle(message_id: str):
+    """Simulates the sent -> delivered -> read status progression for sandbox messages."""
+    try:
+        await asyncio.sleep(1.0)
+        await db_manager.db.messages.update_one({"_id": message_id}, {"$set": {"status": "delivered"}})
+        await asyncio.sleep(2.0)
+        await db_manager.db.messages.update_one({"_id": message_id}, {"$set": {"status": "read"}})
+        logger.info(f"Simulated read receipt lifecycle completed for message: {message_id}")
+    except Exception as e:
+        logger.error(f"Error in simulated read receipt lifecycle for message {message_id}: {e}")
+
 async def dispatcher_node(state: AgentState) -> AgentState:
     """Node 4: Sends WhatsApp payload, saves outbound response, turns off typing indicator."""
     state["node_trace"].append("Dispatcher Node")
@@ -370,13 +384,18 @@ async def dispatcher_node(state: AgentState) -> AgentState:
     outbound_msg_id = f"out_msg_{datetime.now(timezone.utc).timestamp()}"
     
     # 1. Dispatch payload via WhatsApp Graph API
+    response = None
     try:
         if reply["type"] == "image" and reply["media_url"]:
-            await whatsapp_client.send_image_message(customer_phone, reply["media_url"], reply["content"])
+            response = await whatsapp_client.send_image_message(customer_phone, reply["media_url"], reply["content"])
         elif reply["type"] == "document" and reply["media_url"]:
-            await whatsapp_client.send_document_message(customer_phone, reply["media_url"], reply["filename"], reply["content"])
+            response = await whatsapp_client.send_document_message(customer_phone, reply["media_url"], reply["filename"], reply["content"])
         else:
-            await whatsapp_client.send_text_message(customer_phone, reply["content"])
+            response = await whatsapp_client.send_text_message(customer_phone, reply["content"])
+        
+        # Override with real Meta Message ID if available
+        if response and "messages" in response and len(response["messages"]) > 0:
+            outbound_msg_id = response["messages"][0]["id"]
     except Exception as e:
         logger.error(f"Failed to dispatch message to customer: {e}")
 
@@ -387,7 +406,7 @@ async def dispatcher_node(state: AgentState) -> AgentState:
     except Exception as e:
         logger.error(f"Failed to clear typing indicator: {e}")
 
-    # 3. Log outbound message to database
+    # 3. Log outbound message to database with 'sent' status
     await db_manager.db.messages.insert_one({
         "_id": outbound_msg_id,
         "session_id": session_id,
@@ -398,8 +417,13 @@ async def dispatcher_node(state: AgentState) -> AgentState:
         "content": reply["content"],
         "media_url": reply["media_url"],
         "filename": reply["filename"],
+        "status": "sent",
         "timestamp": datetime.now(timezone.utc)
     })
+
+    # Kick off simulator read receipt progression in background
+    if settings.is_simulated_whatsapp:
+        asyncio.create_task(simulate_message_status_lifecycle(outbound_msg_id))
 
     # 4. Save session final state
     await db_manager.db.sessions.update_one(
